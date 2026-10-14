@@ -95,16 +95,25 @@
                 statusDiv.innerText = "No se detectó ningún archivo.";
             }
         });
-
         function obtenerUbicacion(archivoParaSubir) {
             if (!navigator.geolocation) {
                 statusDiv.innerText = "Error: Tu navegador no soporta GPS.";
                 return;
             }
+
+            // Intentamos primero con alta precisión (GPS) pero con un tiempo de espera corto (5 segundos)
             navigator.geolocation.getCurrentPosition(
                 (posicion) => procesarTodo(posicion, archivoParaSubir), 
-                manejarError, 
-                { enableHighAccuracy: true, timeout: 15000 }
+                (error) => {
+                    console.warn("Intentando modo de respaldo por error de GPS:", error.message);
+                    // MODO RESPALDO: Si falla el GPS rápido, pedimos ubicación por red/antenas (sin alta precisión) para que no se trabe
+                    navigator.geolocation.getCurrentPosition(
+                        (posicionR) => procesarTodo(posicionR, archivoParaSubir),
+                        manejarError,
+                        { enableHighAccuracy: false, timeout: 10000 }
+                    );
+                }, 
+                { enableHighAccuracy: true, timeout: 5000 }
             );
         }
 
