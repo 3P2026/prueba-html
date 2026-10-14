@@ -5,46 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>App de Fotos y GPS con Firebase</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f4f4f9; }
-        
-        /* Convertimos el input nativo en un botón real y llamativo */
-        .camera-label {
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            padding: 20px; 
+            background-color: #f4f4f9; 
+        }
+        /* Diseñamos el input de archivo directamente como un botón real sin trucos raros de ocultación */
+        #camera-input {
             background-color: #4CAF50;
             color: white;
-            padding: 15px 30px;
-            font-size: 18px;
+            padding: 15px 20px;
+            font-size: 16px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             margin-top: 20px;
-            display: inline-block;
             font-weight: bold;
+            display: inline-block;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 90%;
         }
-        .camera-label:hover { background-color: #45a049; }
-        
-        /* Ocultamos únicamente el cuadro de texto del input, pero mantenemos su funcionalidad viva */
-        #camera-input {
-            opacity: 0;
-            position: absolute;
-            z-index: -1;
+        .btn-maps { 
+            background-color: #4285F4; 
+            color: white; 
+            padding: 15px 30px; 
+            font-size: 18px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            margin-top: 20px; 
+            text-decoration: none; 
+            display: none; 
         }
-
-        .btn-maps { background-color: #4285F4; color: white; padding: 15px 30px; font-size: 18px; border: none; border-radius: 8px; cursor: pointer; margin-top: 20px; text-decoration: none; display: none; }
         .btn-maps:hover { background-color: #357ae8; }
-        #status { margin-top: 20px; font-weight: bold; color: #333; padding: 12px; border-radius: 5px; background-color: #eaeaea; }
+        #status { 
+            margin-top: 20px; 
+            font-weight: bold; 
+            color: #333; 
+            padding: 12px; 
+            border-radius: 5px; 
+            background-color: #eaeaea; 
+        }
     </style>
 </head>
 <body>
 
     <h1>App con Base de Datos en la Nube 📸📍</h1>
-    <p>Toma una foto: se guardará la imagen, tus coordenadas y abrirá el mapa.</p>
+    <p>Presiona el botón "Seleccionar archivo" para abrir tu cámara, tomar la foto y guardar todo.</p>
 
-    <!-- Al usar un elemento <label> enlazado al input, el celular reconoce el clic directo del usuario sin intermediación de JavaScript -->
-    <label for="camera-input" class="camera-label">📸 Tomar Foto y Guardar</label>
+    <!-- El botón es el input nativo directo para evitar bloqueos del sistema operativo -->
     <input type="file" accept="image/*" capture="environment" id="camera-input">
     
-    <div id="status">Listo para empezar. Presiona el botón verde.</div>
+    <div id="status">Listo para empezar. Elige tu foto.</div>
     <a id="maps-btn" class="btn-maps" target="_blank">Ver en Google Maps 🗺️</a>
 
     <script type="module">
@@ -52,6 +65,7 @@
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://gstatic.com";
         import { getFirestore, collection, addDoc } from "https://gstatic.com";
 
+        // Tus credenciales verificadas
         const firebaseConfig = {
           apiKey: "AIzaSyAth4bQAEcjrbS4ha6qGKLw-h2rzg24tmQ",
           authDomain: "://firebaseapp.com",
@@ -69,47 +83,48 @@
         const statusDiv = document.getElementById('status');
         const mapsBtn = document.getElementById('maps-btn');
 
-        let fotoArchivo = null;
-
         cameraInput.addEventListener('change', (e) => {
+            // Verificamos y extraemos de forma estricta el archivo individual [0]
             if (e.target.files && e.target.files.length > 0) {
-                fotoArchivo = e.target.files[0]; // Capturamos el archivo individual estrictamente
+                const fotoArchivo = e.target.files[0]; 
                 statusDiv.style.backgroundColor = "#fff3cd";
-                statusDiv.innerText = "Foto recibida. Solicitando localización GPS...";
+                statusDiv.innerText = `Foto "${fotoArchivo.name}" recibida. Solicitando localización GPS...`;
                 mapsBtn.style.display = "none";
-                obtenerUbicacion();
+                obtenerUbicacion(fotoArchivo);
             } else {
-                statusDiv.innerText = "No se seleccionó ninguna foto o se canceló.";
+                statusDiv.innerText = "No se detectó ningún archivo.";
             }
         });
 
-        function obtenerUbicacion() {
+        function obtenerUbicacion(archivoParaSubir) {
             if (!navigator.geolocation) {
                 statusDiv.innerText = "Error: Tu navegador no soporta GPS.";
                 return;
             }
-            navigator.geolocation.getCurrentPosition(procesarTodo, manejarError, {
-                enableHighAccuracy: true,
-                timeout: 15000
-            });
+            navigator.geolocation.getCurrentPosition(
+                (posicion) => procesarTodo(posicion, archivoParaSubir), 
+                manejarError, 
+                { enableHighAccuracy: true, timeout: 15000 }
+            );
         }
 
-        async function procesarTodo(posicion) {
+        async function procesarTodo(posicion, archivoParaSubir) {
             const latitud = posicion.coords.latitude.toFixed(6);
             const longitud = posicion.coords.longitude.toFixed(6);
             
             try {
                 statusDiv.innerText = "Subiendo archivo a Firebase Storage... ⏳";
                 
-                const nombreUnico = `${Date.now()}_foto.jpg`;
+                const nombreUnico = `${Date.now()}_${archivoParaSubir.name}`;
                 const storageRef = ref(storage, `fotos/${nombreUnico}`);
                 
-                // Enviamos el objeto file directo sin intermediarios
-                await uploadBytes(storageRef, fotoArchivo);
+                // SOLUCIÓN FIX: Pasamos el archivo binario individual limpio [0]
+                await uploadBytes(storageRef, archivoParaSubir);
                 const fotoUrl = await getDownloadURL(storageRef);
 
                 statusDiv.innerText = "Guardando coordenadas en Firestore Database... 💾";
 
+                // Guardamos en la colección de texto
                 await addDoc(collection(db, "registros_gps"), {
                     lat: latitud,
                     lon: longitud,
@@ -120,6 +135,7 @@
                 statusDiv.style.backgroundColor = "#d4edda";
                 statusDiv.innerText = "¡Todo guardado en la nube con éxito! 🎉 Ready.";
 
+                // Enlace nativo directo según el dispositivo móvil
                 const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
                 mapsBtn.href = isIOS 
                     ? `comgooglemaps://?q=${latitud},${longitud}&zoom=15` 
@@ -136,7 +152,7 @@
 
         function manejarError(error) {
             statusDiv.style.backgroundColor = "#f8d7da";
-            statusDiv.innerText = "Error de GPS: " + error.message + ". Asegúrate de activar tu GPS móvil.";
+            statusDiv.innerText = "Error de GPS: " + error.message + ". Verifica que tu móvil tenga el GPS activo.";
         }
     </script>
 </body>
