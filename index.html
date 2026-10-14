@@ -73,22 +73,33 @@
             }
             navigator.geolocation.getCurrentPosition(progresoExitoso, manejarError);
         }
-        function progresoExitoso(posicion) {
-            // Forzamos el uso de punto decimal convirtiendo los números explícitamente a texto estándar
+               function progresoExitoso(posicion) {
             const latitud = posicion.coords.latitude.toFixed(6);
             const longitud = posicion.coords.longitude.toFixed(6);
             
             statusDiv.innerText = `¡Ubicación encontrada! Lat: ${latitud}, Lon: ${longitud}.`;
 
-            // Construimos la URL limpia usando la API oficial
-            const urlMaps = `https://google.com{latitud},${longitud}`;
+            // Detectamos el sistema operativo del celular
+            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
             
-            // Asignamos el enlace al botón azul
+            let urlMaps = "";
+
+            if (isIOS) {
+                // Protocolo nativo para forzar la App de Google Maps en iOS
+                urlMaps = `comgooglemaps://?q=${latitud},${longitud}&zoom=15`;
+            } else {
+                // Protocolo nativo de intents para Android (Geo-URI)
+                urlMaps = `geo:${latitud},${longitud}?q=${latitud},${longitud}(Mi+Foto)`;
+            }
+
+            // Asignamos el enlace profundo detectado al botón azul
             mapsBtn.href = urlMaps;
             
-            // Mostramos el botón azul
+            // Si por alguna razón falla el Deep Link, dejamos un respaldo web clásico
+            // pero la app nativa debería reaccionar de inmediato al hacer clic.
             mapsBtn.style.display = "inline-block";
         }
+
 
 
         function manejarError(error) {
