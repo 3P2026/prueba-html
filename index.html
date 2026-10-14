@@ -73,19 +73,23 @@
             }
             navigator.geolocation.getCurrentPosition(progresoExitoso, manejarError);
         }
-
         function progresoExitoso(posicion) {
-            const latitud = posicion.coords.latitude;
-            const longitud = posicion.coords.longitude;
+            // Forzamos el uso de punto decimal convirtiendo los números explícitamente a texto estándar
+            const latitud = posicion.coords.latitude.toFixed(6);
+            const longitud = posicion.coords.longitude.toFixed(6);
             
             statusDiv.innerText = `¡Ubicación encontrada! Lat: ${latitud}, Lon: ${longitud}.`;
 
-            // Configuramos el enlace directo en el botón de Google Maps
-            mapsBtn.href = `https://google.com{latitud},${longitud}`;
+            // Construimos la URL limpia usando la API oficial
+            const urlMaps = `https://google.com{latitud},${longitud}`;
             
-            // Mostramos el botón azul para que el usuario haga clic voluntariamente
+            // Asignamos el enlace al botón azul
+            mapsBtn.href = urlMaps;
+            
+            // Mostramos el botón azul
             mapsBtn.style.display = "inline-block";
         }
+
 
         function manejarError(error) {
             switch(error.code) {
