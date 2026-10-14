@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foto y Ubicación con APIs</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background-color: #f4f4f9;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover { background-color: #45a049; }
+        #status {
+            margin-top: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Mi Primer App de APIs 📸📍</h1>
+    <p>Presiona el botón para tomar una foto y ubicarte en el mapa.</p>
+
+    <!-- HTML5 Media Capture: El atributo 'capture' le dice al móvil que abra la cámara -->
+    <input type="file" accept="image/*" capture="environment" id="camera-input" style="display: none;">
+    
+    <button id="start-btn">Tomar Foto y Ubicar</button>
+    
+    <div id="status"></div>
+
+    <script>
+        const startBtn = document.getElementById('start-btn');
+        const cameraInput = document.getElementById('camera-input');
+        const statusDiv = document.getElementById('status');
+
+        // Al hacer clic en nuestro botón personalizado, activamos el input de la cámara
+        startBtn.addEventListener('click', () => {
+            cameraInput.click();
+        });
+
+        // Cuando el usuario toma la foto y la acepta, se dispara este evento
+        cameraInput.addEventListener('change', () => {
+            statusDiv.innerText = "Foto capturada con éxito. Obteniendo ubicación GPS...";
+            obtenerUbicacion();
+        });
+
+        function obtenerUbicacion() {
+            // Validamos si el navegador soporta la API de Geolocalización
+            if (!navigator.geolocation) {
+                statusDiv.innerText = "Lo siento, tu navegador no soporta Geolocalización.";
+                return;
+            }
+
+            // Llamamos a la API de Geolocalización
+            navigator.geolocation.getCurrentPosition(progresoExitoso, manejarError);
+        }
+
+        function progresoExitoso(posicion) {
+            const latitud = posicion.coords.latitude;
+            const longitud = posicion.coords.longitude;
+            
+            statusDiv.innerText = `¡Ubicación encontrada! Lat: ${latitud}, Lon: ${longitud}. Redirigiendo...`;
+
+            // Construimos la URL de la API pública de Google Maps
+            const urlMaps = `https://google.com{latitud},${longitud}`;
+
+            // Abrimos Google Maps en una pestaña nueva (o abrirá la app nativa en el celular)
+            setTimeout(() => {
+                window.open(urlMaps, '_blank');
+            }, 1500);
+        }
+
+        function manejarError(error) {
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    statusDiv.innerText = "Error: Debes permitir el acceso al GPS para continuar.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    statusDiv.innerText = "Error: La información de ubicación no está disponible.";
+                    break;
+                case error.TIMEOUT:
+                    statusDiv.innerText = "Error: Se agotó el tiempo de espera para obtener la ubicación.";
+                    break;
+                default:
+                    statusDiv.innerText = "Ocurrió un error desconocido al buscar la ubicación.";
+                    break;
+            }
+        }
+    </script>
+</body>
+</html>
