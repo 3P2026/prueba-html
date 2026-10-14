@@ -11,7 +11,7 @@
         #start-btn:hover { background-color: #45a049; }
         #maps-btn { background-color: #4285F4; display: none; }
         #maps-btn:hover { background-color: #357ae8; }
-        #status { margin-top: 20px; font-weight: bold; color: #333; }
+        #status { margin-top: 20px; font-weight: bold; color: #333; padding: 10px; border-radius: 5px; }
     </style>
 </head>
 <body>
@@ -19,9 +19,12 @@
     <h1>App con Base de Datos en la Nube 📸📍</h1>
     <p>Toma una foto: se guardará la imagen, tus coordenadas y abrirá el mapa.</p>
 
+    <!-- El input nativo invisible -->
     <input type="file" accept="image/*" capture="environment" id="camera-input" style="display: none;">
+    
     <button id="start-btn" class="btn">Tomar Foto y Guardar</button>
-    <div id="status"></div>
+    
+    <div id="status">Listo para empezar. Presiona el botón verde.</div>
     <a id="maps-btn" class="btn" target="_blank">Ver en Google Maps 🗺️</a>
 
     <script type="module">
@@ -32,7 +35,7 @@
         // Configuración oficial de tu proyecto Firebase
         const firebaseConfig = {
           apiKey: "AIzaSyAth4bQAEcjrbS4ha6qGKLw-h2rzg24tmQ",
-          authDomain: "app-fotos-gps.firebaseapp.com",
+          authDomain: "://firebaseapp.com",
           projectId: "app-fotos-gps",
           storageBucket: "app-fotos-gps.firebasestorage.app",
           messagingSenderId: "737555190343",
@@ -51,17 +54,23 @@
 
         let fotoArchivo = null;
 
+        // Al hacer clic en el botón visible, disparamos el input de cámara oculto
         startBtn.addEventListener('click', () => {
+            statusDiv.innerText = "Abriendo la cámara...";
             cameraInput.click();
         });
 
+        // Cuando la cámara devuelve la imagen
         cameraInput.addEventListener('change', (e) => {
-            // Accedemos al primer archivo seleccionado de la cámara [0]
-            fotoArchivo = e.target.files[0];
-            if (fotoArchivo) {
-                statusDiv.innerText = "Foto lista. Obteniendo ubicación GPS...";
+            // SOLUCIÓN: Accedemos al archivo único [0] en vez de a la lista completa
+            if (e.target.files && e.target.files.length > 0) {
+                fotoArchivo = e.target.files[0]; 
+                statusDiv.style.backgroundColor = "#fff3cd";
+                statusDiv.innerText = "Foto recibida. Solicitando localización GPS...";
                 mapsBtn.style.display = "none";
                 obtenerUbicacion();
+            } else {
+                statusDiv.innerText = "No se seleccionó ninguna foto.";
             }
         });
 
@@ -70,7 +79,11 @@
                 statusDiv.innerText = "Error: Tu navegador no soporta GPS.";
                 return;
             }
-            navigator.geolocation.getCurrentPosition(procesarTodo, manejarError);
+            // Pedimos coordenadas con máxima precisión
+            navigator.geolocation.getCurrentPosition(procesarTodo, manejarError, {
+                enableHighAccuracy: true,
+                timeout: 10000
+            });
         }
 
         async function procesarTodo(posicion) {
@@ -78,19 +91,19 @@
             const longitud = posicion.coords.longitude.toFixed(6);
             
             try {
-                statusDiv.innerText = "Subiendo foto a Firebase Storage... ⏳";
+                statusDiv.innerText = "Subiendo archivo a Firebase Storage... ⏳";
                 
-                // 1. Subimos el archivo de la foto a la nube con un nombre único basado en el tiempo
-                const nombreUnico = `${Date.now()}_${fotoArchivo.name}`;
+                // Generamos un nombre de archivo único
+                const nombreUnico = `${Date.now()}_foto.jpg`;
                 const storageRef = ref(storage, `fotos/${nombreUnico}`);
-                await uploadBytes(storageRef, fotoArchivo);
                 
-                // Obtenemos la dirección web (URL) de la foto ya subida
+                // Subida del archivo binario real
+                await uploadBytes(storageRef, fotoArchivo);
                 const fotoUrl = await getDownloadURL(storageRef);
 
-                statusDiv.innerText = "Guardando coordenadas en la Base de Datos (Firestore)... 💾";
+                statusDiv.innerText = "Guardando coordenadas en Firestore Database... 💾";
 
-                // 2. Guardamos un registro con los datos en la base de datos Firestore
+                // Guardado de la metadata de texto
                 await addDoc(collection(db, "registros_gps"), {
                     lat: latitud,
                     lon: longitud,
@@ -98,9 +111,10 @@
                     fecha: new Date().toISOString()
                 });
 
+                statusDiv.style.backgroundColor = "#d4edda";
                 statusDiv.innerText = "¡Todo guardado en la nube con éxito! 🎉 Ready.";
 
-                // 3. Preparamos el botón para saltar a la app nativa de Google Maps
+                // Construcción del enlace nativo para Google Maps
                 const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
                 mapsBtn.href = isIOS 
                     ? `comgooglemaps://?q=${latitud},${longitud}&zoom=15` 
@@ -110,12 +124,14 @@
 
             } catch (error) {
                 console.error(error);
-                statusDiv.innerText = "Error al conectar con Firebase: " + error.message;
+                statusDiv.style.backgroundColor = "#f8d7da";
+                statusDiv.innerText = "Error crítico en Firebase: " + error.message;
             }
         }
 
         function manejarError(error) {
-            statusDiv.innerText = "Error de GPS: " + error.message;
+            statusDiv.style.backgroundColor = "#f8d7da";
+            statusDiv.innerText = "Error de GPS: " + error.message + ". Verifica si tienes activo el GPS del móvil.";
         }
     </script>
 </body>
