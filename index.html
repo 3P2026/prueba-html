@@ -11,7 +11,7 @@
             padding: 20px;
             background-color: #f4f4f9;
         }
-        button {
+        .btn {
             background-color: #4CAF50;
             color: white;
             padding: 15px 30px;
@@ -20,8 +20,15 @@
             border-radius: 8px;
             cursor: pointer;
             margin-top: 20px;
+            text-decoration: none;
+            display: inline-block;
         }
-        button:hover { background-color: #45a049; }
+        .btn:hover { background-color: #45a049; }
+        #maps-btn {
+            background-color: #4285F4;
+            display: none; /* Oculto al inicio */
+        }
+        #maps-btn:hover { background-color: #357ae8; }
         #status {
             margin-top: 20px;
             font-weight: bold;
@@ -34,37 +41,36 @@
     <h1>Mi Primer App de APIs 📸📍</h1>
     <p>Presiona el botón para tomar una foto y ubicarte en el mapa.</p>
 
-    <!-- HTML5 Media Capture: El atributo 'capture' le dice al móvil que abra la cámara -->
     <input type="file" accept="image/*" capture="environment" id="camera-input" style="display: none;">
     
-    <button id="start-btn">Tomar Foto y Ubicar</button>
+    <button id="start-btn" class="btn">Tomar Foto y Ubicar</button>
     
     <div id="status"></div>
+
+    <!-- Este botón llevará directamente a Google Maps sin que el navegador lo bloquee -->
+    <a id="maps-btn" class="btn" target="_blank">Ver en Google Maps 🗺️</a>
 
     <script>
         const startBtn = document.getElementById('start-btn');
         const cameraInput = document.getElementById('camera-input');
         const statusDiv = document.getElementById('status');
+        const mapsBtn = document.getElementById('maps-btn');
 
-        // Al hacer clic en nuestro botón personalizado, activamos el input de la cámara
         startBtn.addEventListener('click', () => {
             cameraInput.click();
         });
 
-        // Cuando el usuario toma la foto y la acepta, se dispara este evento
         cameraInput.addEventListener('change', () => {
             statusDiv.innerText = "Foto capturada con éxito. Obteniendo ubicación GPS...";
+            mapsBtn.style.display = "none"; // Por si repiten el proceso
             obtenerUbicacion();
         });
 
         function obtenerUbicacion() {
-            // Validamos si el navegador soporta la API de Geolocalización
             if (!navigator.geolocation) {
                 statusDiv.innerText = "Lo siento, tu navegador no soporta Geolocalización.";
                 return;
             }
-
-            // Llamamos a la API de Geolocalización
             navigator.geolocation.getCurrentPosition(progresoExitoso, manejarError);
         }
 
@@ -72,27 +78,25 @@
             const latitud = posicion.coords.latitude;
             const longitud = posicion.coords.longitude;
             
-            statusDiv.innerText = `¡Ubicación encontrada! Lat: ${latitud}, Lon: ${longitud}. Redirigiendo...`;
+            statusDiv.innerText = `¡Ubicación encontrada! Lat: ${latitud}, Lon: ${longitud}.`;
 
-            // Construimos la URL de la API pública de Google Maps
-            const urlMaps = `https://google.com{latitud},${longitud}`;
-
-            // Abrimos Google Maps en una pestaña nueva (o abrirá la app nativa en el celular)
-            setTimeout(() => {
-                window.open(urlMaps, '_blank');
-            }, 1500);
+            // Configuramos el enlace directo en el botón de Google Maps
+            mapsBtn.href = `https://google.com{latitud},${longitud}`;
+            
+            // Mostramos el botón azul para que el usuario haga clic voluntariamente
+            mapsBtn.style.display = "inline-block";
         }
 
         function manejarError(error) {
             switch(error.code) {
                 case error.PERMISSION_DENIED:
-                    statusDiv.innerText = "Error: Debes permitir el acceso al GPS para continuar.";
+                    statusDiv.innerText = "Error: Debes permitir el acceso al GPS en tu navegador.";
                     break;
                 case error.POSITION_UNAVAILABLE:
                     statusDiv.innerText = "Error: La información de ubicación no está disponible.";
                     break;
                 case error.TIMEOUT:
-                    statusDiv.innerText = "Error: Se agotó el tiempo de espera para obtener la ubicación.";
+                    statusDiv.innerText = "Error: Se agotó el tiempo de espera.";
                     break;
                 default:
                     statusDiv.innerText = "Ocurrió un error desconocido al buscar la ubicación.";
@@ -102,3 +106,4 @@
     </script>
 </body>
 </html>
+
