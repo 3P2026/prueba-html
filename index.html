@@ -3,122 +3,120 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Foto y Ubicación con APIs</title>
+    <title>App de Fotos y GPS con Firebase</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 20px;
-            background-color: #f4f4f9;
-        }
-        .btn {
-            background-color: #4CAF50;
-            color: white;
-            padding: 15px 30px;
-            font-size: 18px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-top: 20px;
-            text-decoration: none;
-            display: inline-block;
-        }
-        .btn:hover { background-color: #45a049; }
-        #maps-btn {
-            background-color: #4285F4;
-            display: none; /* Oculto al inicio */
-        }
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f4f4f9; }
+        .btn { color: white; padding: 15px 30px; font-size: 18px; border: none; border-radius: 8px; cursor: pointer; margin-top: 20px; text-decoration: none; display: inline-block; }
+        #start-btn { background-color: #4CAF50; }
+        #start-btn:hover { background-color: #45a049; }
+        #maps-btn { background-color: #4285F4; display: none; }
         #maps-btn:hover { background-color: #357ae8; }
-        #status {
-            margin-top: 20px;
-            font-weight: bold;
-            color: #333;
-        }
+        #status { margin-top: 20px; font-weight: bold; color: #333; }
     </style>
 </head>
 <body>
 
-    <h1>Mi Primer App de APIs 📸📍</h1>
-    <p>Presiona el botón para tomar una foto y ubicarte en el mapa.</p>
+    <h1>App con Base de Datos en la Nube 📸📍</h1>
+    <p>Toma una foto: se guardará la imagen, tus coordenadas y abrirá el mapa.</p>
 
     <input type="file" accept="image/*" capture="environment" id="camera-input" style="display: none;">
-    
-    <button id="start-btn" class="btn">Tomar Foto y Ubicar</button>
-    
+    <button id="start-btn" class="btn">Tomar Foto y Guardar</button>
     <div id="status"></div>
-
-    <!-- Este botón llevará directamente a Google Maps sin que el navegador lo bloquee -->
     <a id="maps-btn" class="btn" target="_blank">Ver en Google Maps 🗺️</a>
 
-    <script>
+    <script type="module">
+        import { initializeApp } from "https://gstatic.com";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://gstatic.com";
+        import { getFirestore, collection, addDoc } from "https://gstatic.com";
+
+        // Configuración oficial de tu proyecto Firebase
+        const firebaseConfig = {
+          apiKey: "AIzaSyAth4bQAEcjrbS4ha6qGKLw-h2rzg24tmQ",
+          authDomain: "app-fotos-gps.firebaseapp.com",
+          projectId: "app-fotos-gps",
+          storageBucket: "app-fotos-gps.firebasestorage.app",
+          messagingSenderId: "737555190343",
+          appId: "1:737555190343:web:2342ebc29b686ccee29762"
+        };
+
+        // Inicializamos Firebase y sus herramientas
+        const app = initializeApp(firebaseConfig);
+        const storage = getStorage(app);
+        const db = getFirestore(app);
+
         const startBtn = document.getElementById('start-btn');
         const cameraInput = document.getElementById('camera-input');
         const statusDiv = document.getElementById('status');
         const mapsBtn = document.getElementById('maps-btn');
 
+        let fotoArchivo = null;
+
         startBtn.addEventListener('click', () => {
             cameraInput.click();
         });
 
-        cameraInput.addEventListener('change', () => {
-            statusDiv.innerText = "Foto capturada con éxito. Obteniendo ubicación GPS...";
-            mapsBtn.style.display = "none"; // Por si repiten el proceso
-            obtenerUbicacion();
+        cameraInput.addEventListener('change', (e) => {
+            // Accedemos al primer archivo seleccionado de la cámara [0]
+            fotoArchivo = e.target.files[0];
+            if (fotoArchivo) {
+                statusDiv.innerText = "Foto lista. Obteniendo ubicación GPS...";
+                mapsBtn.style.display = "none";
+                obtenerUbicacion();
+            }
         });
 
         function obtenerUbicacion() {
             if (!navigator.geolocation) {
-                statusDiv.innerText = "Lo siento, tu navegador no soporta Geolocalización.";
+                statusDiv.innerText = "Error: Tu navegador no soporta GPS.";
                 return;
             }
-            navigator.geolocation.getCurrentPosition(progresoExitoso, manejarError);
+            navigator.geolocation.getCurrentPosition(procesarTodo, manejarError);
         }
-               function progresoExitoso(posicion) {
+
+        async function procesarTodo(posicion) {
             const latitud = posicion.coords.latitude.toFixed(6);
             const longitud = posicion.coords.longitude.toFixed(6);
             
-            statusDiv.innerText = `¡Ubicación encontrada! Lat: ${latitud}, Lon: ${longitud}.`;
+            try {
+                statusDiv.innerText = "Subiendo foto a Firebase Storage... ⏳";
+                
+                // 1. Subimos el archivo de la foto a la nube con un nombre único basado en el tiempo
+                const nombreUnico = `${Date.now()}_${fotoArchivo.name}`;
+                const storageRef = ref(storage, `fotos/${nombreUnico}`);
+                await uploadBytes(storageRef, fotoArchivo);
+                
+                // Obtenemos la dirección web (URL) de la foto ya subida
+                const fotoUrl = await getDownloadURL(storageRef);
 
-            // Detectamos el sistema operativo del celular
-            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-            
-            let urlMaps = "";
+                statusDiv.innerText = "Guardando coordenadas en la Base de Datos (Firestore)... 💾";
 
-            if (isIOS) {
-                // Protocolo nativo para forzar la App de Google Maps en iOS
-                urlMaps = `comgooglemaps://?q=${latitud},${longitud}&zoom=15`;
-            } else {
-                // Protocolo nativo de intents para Android (Geo-URI)
-                urlMaps = `geo:${latitud},${longitud}?q=${latitud},${longitud}(Mi+Foto)`;
+                // 2. Guardamos un registro con los datos en la base de datos Firestore
+                await addDoc(collection(db, "registros_gps"), {
+                    lat: latitud,
+                    lon: longitud,
+                    foto: fotoUrl,
+                    fecha: new Date().toISOString()
+                });
+
+                statusDiv.innerText = "¡Todo guardado en la nube con éxito! 🎉 Ready.";
+
+                // 3. Preparamos el botón para saltar a la app nativa de Google Maps
+                const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+                mapsBtn.href = isIOS 
+                    ? `comgooglemaps://?q=${latitud},${longitud}&zoom=15` 
+                    : `geo:${latitud},${longitud}?q=${latitud},${longitud}(Mi+Foto)`;
+                
+                mapsBtn.style.display = "inline-block";
+
+            } catch (error) {
+                console.error(error);
+                statusDiv.innerText = "Error al conectar con Firebase: " + error.message;
             }
-
-            // Asignamos el enlace profundo detectado al botón azul
-            mapsBtn.href = urlMaps;
-            
-            // Si por alguna razón falla el Deep Link, dejamos un respaldo web clásico
-            // pero la app nativa debería reaccionar de inmediato al hacer clic.
-            mapsBtn.style.display = "inline-block";
         }
 
-
-
         function manejarError(error) {
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    statusDiv.innerText = "Error: Debes permitir el acceso al GPS en tu navegador.";
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    statusDiv.innerText = "Error: La información de ubicación no está disponible.";
-                    break;
-                case error.TIMEOUT:
-                    statusDiv.innerText = "Error: Se agotó el tiempo de espera.";
-                    break;
-                default:
-                    statusDiv.innerText = "Ocurrió un error desconocido al buscar la ubicación.";
-                    break;
-            }
+            statusDiv.innerText = "Error de GPS: " + error.message;
         }
     </script>
 </body>
 </html>
-
